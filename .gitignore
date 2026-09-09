@@ -1,0 +1,24 @@
+# PlatformIO build directories and internal state
+.pio/
+.pioenvs/
+.piolibdeps/
+.clang_complete
+.gcc-flags.json
+
+# IDE and workspace files
+.vscode/
+.idea/
+*.code-workspace
+
+# Compiled objects and binaries (ESP32 firmware outputs)
+*.o
+*.obj
+*.a
+*.lib
+*.elf
+*.bin
+*.hex
+
+# Operating system files
+.DS_Store
+Thumbs.db
