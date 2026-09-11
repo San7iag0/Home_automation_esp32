@@ -1,52 +1,65 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include <WiFiUdp.h>
 
 constexpr char WIFI_SSID[] = "Santiago";
 constexpr char WIFI_PASSWORD[] = "KeepeR4Ever";
+
+constexpr unsigned int UDP_PORT = 4210;
+
+WiFiUDP udp;
 
 void setup()
 {
     Serial.begin(115200);
     delay(1000);
 
-    Serial.println();
-    Serial.println("ESP-01S starting...");
-
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
     Serial.print("Connecting to WiFi");
 
-    int attempts = 0;
-
-    while (WiFi.status() != WL_CONNECTED && attempts < 30)
+    while (WiFi.status() != WL_CONNECTED)
     {
         delay(500);
         Serial.print(".");
-        attempts++;
     }
 
     Serial.println();
+    Serial.println("WiFi connected!");
 
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        Serial.println("WiFi connected!");
+    Serial.print("ESP-01S IP: ");
+    Serial.println(WiFi.localIP());
 
-        Serial.print("ESP-01S IP: ");
-        Serial.println(WiFi.localIP());
+    udp.begin(UDP_PORT);
 
-        Serial.print("RSSI: ");
-        Serial.println(WiFi.RSSI());
-    }
-    else
-    {
-        Serial.println("WiFi connection failed");
-        Serial.print("Status: ");
-        Serial.println(WiFi.status());
-    }
+    Serial.print("UDP listening on port ");
+    Serial.println(UDP_PORT);
 }
 
 void loop()
 {
-    delay(1000);
+    int packetSize = udp.parsePacket();
+
+    if (packetSize > 0)
+    {
+        char buffer[32];
+
+        int length = udp.read(buffer, sizeof(buffer) - 1);
+        buffer[length] = '\0';
+
+        Serial.print("Received: ");
+        Serial.println(buffer);
+
+        if (strcmp(buffer, "PING") == 0)
+        {
+            udp.beginPacket(udp.remoteIP(), udp.remotePort());
+            udp.print("PONG");
+            udp.endPacket();
+
+            Serial.println("Sent: PONG");
+        }
+    }
+
+    delay(10);
 }

@@ -4,60 +4,63 @@
 constexpr char WIFI_SSID[] = "Santiago";
 constexpr char WIFI_PASSWORD[] = "KeepeR4Ever";
 
+constexpr char ESP01_IP[] = "192.168.1.33";
+constexpr unsigned int ESP01_PORT = 4210;
+
+WiFiUDP udp;
+
 void setup()
 {
     Serial.begin(115200);
     delay(1000);
 
-    Serial.println();
-    Serial.println("Connecting to WiFi:");
-    Serial.println(WIFI_SSID);
-
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-    int attempts = 0;
+    Serial.print("Connecting to WiFi");
 
-    while (WiFi.status() != WL_CONNECTED && attempts < 30)
+    while (WiFi.status() != WL_CONNECTED)
     {
         delay(500);
-
         Serial.print(".");
-        Serial.print(" status=");
-        Serial.println(WiFi.status());
-
-        attempts++;
     }
 
     Serial.println();
+    Serial.println("WiFi connected!");
 
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        Serial.println("================================");
-        Serial.println("WiFi connected!");
-        Serial.println("================================");
-
-        Serial.print("IP address: ");
-        Serial.println(WiFi.localIP());
-
-        Serial.print("Gateway: ");
-        Serial.println(WiFi.gatewayIP());
-
-        Serial.print("RSSI: ");
-        Serial.println(WiFi.RSSI());
-    }
-    else
-    {
-        Serial.println("================================");
-        Serial.println("WiFi connection FAILED");
-        Serial.println("================================");
-
-        Serial.print("Final status: ");
-        Serial.println(WiFi.status());
-    }
+    Serial.print("ESP32 IP: ");
+    Serial.println(WiFi.localIP());
 }
 
 void loop()
 {
-    delay(1000);
+    Serial.println("Sending PING...");
+
+    udp.beginPacket(ESP01_IP, ESP01_PORT);
+    udp.print("PING");
+    udp.endPacket();
+
+    unsigned long start = millis();
+
+    while (millis() - start < 2000)
+    {
+        int packetSize = udp.parsePacket();
+
+        if (packetSize > 0)
+        {
+            char buffer[32];
+
+            int length = udp.read(buffer, sizeof(buffer) - 1);
+            buffer[length] = '\0';
+
+            Serial.print("Received: ");
+            Serial.println(buffer);
+
+            break;
+        }
+
+        delay(10);
+    }
+
+    delay(3000);
 }
