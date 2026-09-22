@@ -6,13 +6,33 @@ constexpr char WIFI_SSID[] = "Santiago";
 constexpr char WIFI_PASSWORD[] = "KeepeR4Ever";
 
 constexpr unsigned int UDP_PORT = 4210;
+constexpr uint8_t RELAY_PIN = 0; // GPIO0
 
 WiFiUDP udp;
+
+void sendResponse(const char* message)
+{
+    udp.beginPacket(udp.remoteIP(), udp.remotePort());
+    udp.print(message);
+    udp.endPacket();
+
+    Serial.print("Sent: ");
+    Serial.println(message);
+}
 
 void setup()
 {
     Serial.begin(115200);
     delay(1000);
+
+    // Relay V4.0: active LOW.
+    // Set the output HIGH to keep the relay OFF
+    // after normal application startup.
+    pinMode(RELAY_PIN, OUTPUT);
+    digitalWrite(RELAY_PIN, HIGH);
+
+    Serial.println();
+    Serial.println("ESP-01S starting...");
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -53,11 +73,23 @@ void loop()
 
         if (strcmp(buffer, "PING") == 0)
         {
-            udp.beginPacket(udp.remoteIP(), udp.remotePort());
-            udp.print("PONG");
-            udp.endPacket();
+            sendResponse("PONG");
+        }
+        else if (strcmp(buffer, "RELAY_ON") == 0)
+        {
+            digitalWrite(RELAY_PIN, LOW);
 
-            Serial.println("Sent: PONG");
+            Serial.println("Relay ON");
+
+            sendResponse("ACK:RELAY_ON");
+        }
+        else if (strcmp(buffer, "RELAY_OFF") == 0)
+        {
+            digitalWrite(RELAY_PIN, HIGH);
+
+            Serial.println("Relay OFF");
+
+            sendResponse("ACK:RELAY_OFF");
         }
     }
 
