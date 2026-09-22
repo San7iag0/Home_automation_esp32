@@ -9,6 +9,41 @@ constexpr unsigned int ESP01_PORT = 4210;
 
 WiFiUDP udp;
 
+
+void sendCommand(const char* command)
+{
+    Serial.print("Sending: ");
+    Serial.println(command);
+
+    udp.beginPacket(ESP01_IP, ESP01_PORT);
+    udp.print(command);
+    udp.endPacket();
+
+    unsigned long start = millis();
+
+    while (millis() - start < 2000)
+    {
+        int packetSize = udp.parsePacket();
+
+        if (packetSize > 0)
+        {
+            char buffer[32];
+
+            int length = udp.read(buffer, sizeof(buffer) - 1);
+            buffer[length] = '\0';
+
+            Serial.print("Received: ");
+            Serial.println(buffer);
+
+            return;
+        }
+
+        delay(10);
+    }
+
+    Serial.println("No ACK received");
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -61,6 +96,11 @@ void loop()
 
         delay(10);
     }
+    sendCommand("RELAY_ON");
+
+    delay(3000);
+
+    sendCommand("RELAY_OFF");
 
     delay(3000);
 }
