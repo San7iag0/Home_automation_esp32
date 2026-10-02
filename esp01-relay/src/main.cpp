@@ -6,11 +6,14 @@ constexpr char WIFI_SSID[] = "Santiago";
 constexpr char WIFI_PASSWORD[] = "KeepeR4Ever";
 
 constexpr unsigned int UDP_PORT = 4210;
-constexpr uint8_t RELAY_PIN = 0; // GPIO0
+constexpr uint8_t RELAY_PIN = 0;  // GPIO0, active LOW
+constexpr uint8_t SWITCH_PIN = 2; // GPIO2
 
 WiFiUDP udp;
 
 bool relayState = false;
+//variable to remember the previous switch state:
+bool lastSwitchState = HIGH;
 
 // --------------------------------------------------
 // Relay control
@@ -42,7 +45,7 @@ void sendResponse(const char* message)
 }
 
 // --------------------------------------------------
-// Command handling
+// UDP command handling
 // --------------------------------------------------
 
 void handleCommand(const char* command)
@@ -75,6 +78,36 @@ void handleCommand(const char* command)
 }
 
 // --------------------------------------------------
+// Physical switch
+// --------------------------------------------------
+
+void handlePhysicalSwitch()
+{
+    bool currentSwitchState = digitalRead(SWITCH_PIN);
+
+    if (currentSwitchState != lastSwitchState)
+    {
+        delay(20);
+
+        currentSwitchState = digitalRead(SWITCH_PIN);
+
+        if (currentSwitchState != lastSwitchState)
+        {
+            lastSwitchState = currentSwitchState;
+
+            // Button pressed
+            if (currentSwitchState == LOW)
+            {
+                setRelay(!relayState);
+
+                Serial.print("Physical switch -> Relay: ");
+                Serial.println(relayState ? "ON" : "OFF");
+            }
+        }
+    }
+}
+
+// --------------------------------------------------
 // Setup
 // --------------------------------------------------
 
@@ -86,11 +119,15 @@ void setup()
     Serial.println();
     Serial.println("ESP-01S starting...");
 
-    // Relay OFF during normal startup
+    // Relay OFF during startup
     pinMode(RELAY_PIN, OUTPUT);
     digitalWrite(RELAY_PIN, HIGH);
 
     relayState = false;
+
+    // Physical switch
+    pinMode(SWITCH_PIN, INPUT_PULLUP);
+    lastSwitchState = digitalRead(SWITCH_PIN);
 
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
@@ -125,6 +162,10 @@ void setup()
 
 void loop()
 {
+    // Handle physical switch
+    handlePhysicalSwitch();
+
+    // Handle UDP
     int packetSize = udp.parsePacket();
 
     if (packetSize > 0)
