@@ -10,31 +10,88 @@ constexpr uint8_t RELAY_PIN = 0; // GPIO0
 
 WiFiUDP udp;
 
+bool relayState = false;
+
+// --------------------------------------------------
+// Relay control
+// --------------------------------------------------
+
+void setRelay(bool state)
+{
+    relayState = state;
+
+    // Relay is active LOW
+    digitalWrite(RELAY_PIN, relayState ? LOW : HIGH);
+
+    Serial.print("Relay state: ");
+    Serial.println(relayState ? "ON" : "OFF");
+}
+
+// --------------------------------------------------
+// UDP response
+// --------------------------------------------------
+
 void sendResponse(const char* message)
 {
     udp.beginPacket(udp.remoteIP(), udp.remotePort());
-    udp.print(message);
+    udp.write(message);
     udp.endPacket();
 
     Serial.print("Sent: ");
     Serial.println(message);
 }
 
+// --------------------------------------------------
+// Command handling
+// --------------------------------------------------
+
+void handleCommand(const char* command)
+{
+    Serial.print("Received: ");
+    Serial.println(command);
+
+    if (strcmp(command, "PING") == 0)
+    {
+        sendResponse("PONG");
+    }
+    else if (strcmp(command, "RELAY_ON") == 0)
+    {
+        setRelay(true);
+        sendResponse("ACK:RELAY_ON");
+    }
+    else if (strcmp(command, "RELAY_OFF") == 0)
+    {
+        setRelay(false);
+        sendResponse("ACK:RELAY_OFF");
+    }
+    else if (strcmp(command, "GET_STATE") == 0)
+    {
+        sendResponse(relayState ? "STATE:ON" : "STATE:OFF");
+    }
+    else
+    {
+        sendResponse("ERROR:UNKNOWN_COMMAND");
+    }
+}
+
+// --------------------------------------------------
+// Setup
+// --------------------------------------------------
+
 void setup()
 {
     Serial.begin(115200);
-    delay(1000);
-
-    // Relay V4.0: active LOW.
-    // Set the output HIGH to keep the relay OFF
-    // after normal application startup.
-    pinMode(RELAY_PIN, OUTPUT);
-    digitalWrite(RELAY_PIN, HIGH);
+    delay(100);
 
     Serial.println();
     Serial.println("ESP-01S starting...");
 
-    WiFi.mode(WIFI_STA);
+    // Relay OFF during normal startup
+    pinMode(RELAY_PIN, OUTPUT);
+    digitalWrite(RELAY_PIN, HIGH);
+
+    relayState = false;
+
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
     Serial.print("Connecting to WiFi");
@@ -51,11 +108,20 @@ void setup()
     Serial.print("ESP-01S IP: ");
     Serial.println(WiFi.localIP());
 
+    Serial.print("RSSI: ");
+    Serial.println(WiFi.RSSI());
+
     udp.begin(UDP_PORT);
 
     Serial.print("UDP listening on port ");
     Serial.println(UDP_PORT);
+
+    Serial.println("Relay initialized OFF");
 }
+
+// --------------------------------------------------
+// Main loop
+// --------------------------------------------------
 
 void loop()
 {
@@ -63,35 +129,14 @@ void loop()
 
     if (packetSize > 0)
     {
-        char buffer[32];
+        char packet[128];
 
-        int length = udp.read(buffer, sizeof(buffer) - 1);
-        buffer[length] = '\0';
+        int length = udp.read(packet, sizeof(packet) - 1);
 
-        Serial.print("Received: ");
-        Serial.println(buffer);
-
-        if (strcmp(buffer, "PING") == 0)
+        if (length > 0)
         {
-            sendResponse("PONG");
-        }
-        else if (strcmp(buffer, "RELAY_ON") == 0)
-        {
-            digitalWrite(RELAY_PIN, LOW);
-
-            Serial.println("Relay ON");
-
-            sendResponse("ACK:RELAY_ON");
-        }
-        else if (strcmp(buffer, "RELAY_OFF") == 0)
-        {
-            digitalWrite(RELAY_PIN, HIGH);
-
-            Serial.println("Relay OFF");
-
-            sendResponse("ACK:RELAY_OFF");
+            packet[length] = '\0';
+            handleCommand(packet);
         }
     }
-
-    delay(10);
 }
